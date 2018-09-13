@@ -22,6 +22,12 @@ type templateHandler struct {
 	templ *template.Template
 }
 
+var avatars Avatar = TryAvatars{
+	UseFileSystemAvatar,
+	UseAuthAvatar,
+	UseGravatar,
+}
+
 func (t *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	t.once.Do(func() {
 		t.templ = template.Must(template.ParseFiles(filepath.Join("templates", t.filename)))
@@ -44,7 +50,7 @@ func main() {
 		github.New("key", "secret", "http://localhost:8080/auth/callback/github"),
 		google.New("5754647965-sfh6ahbgcta78d1jb91d2cf9hm3ipe4v.apps.googleusercontent.com", "qCdUqW8_zG8o5lgZwGFgZ4NC", "http://localhost:8080/auth/callback/google"),
 	)
-	r := newRoom()
+	r := newRoom(UseFileSystemAvatar)
 	r.tracer = trace.New(os.Stdout)
 	http.Handle("/", &templateHandler{filename: "chat.html"})
 	http.Handle("/assets", http.StripPrefix("/assets", http.FileServer(http.Dir("/path/to/assets/"))))
@@ -62,6 +68,11 @@ func main() {
 	http.HandleFunc("/auth/", loginHandler)
 	http.Handle("/chat", MustAuth(&templateHandler{filename: "chat.html"}))
 	http.Handle("/room", r)
+	http.Handle("/upload", &templateHandler{filename: "upload.html"})
+	http.HandleFunc("/uploader", uploaderHandler)
+	http.Handle("/avatars/",
+		http.StripPrefix("/avatars/",
+			http.FileServer(http.Dir("./avatars"))))
 	go r.run()
 	log.Println("Starting web server on", *addr)
 	if err := http.ListenAndServe(":8080", nil);
